@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../include/image_formats.h"
-#include "../include/algorithms.h"
+#include "image_formats.h"
+#include "algorithms.h"
 
 int main(int argc, char **argv)
 {
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     // Imprimindo matriz da imagem
     printf("Total de Objetos: %d\nTotal de Furos: %d\nObjetos com Furos: %d\n", totalComponentes, totalFuros, objetosComFuros);
     printf("Salvando arquivo 'saida.ppm' destacando objetos e furos em %d tons de cinza.\n", totalCores+1);
-    fprintf(saida, "%s#Criado por Charlie, Elana e Gabriel\n%d %d\n%d\n", "P2\n", p->largura, p->altura, totalCores);
+    fprintf(saida, "%s#Criado por Charlie Fonseca e Elana Sande\n%d %d\n%d\n", "P2\n", p->largura, p->altura, totalCores);
 
     // Imprime a matrizSaida no arquivo de saída como tons de cinza, diferenciando furos, objetos e background com contraste
     for(int a = 0; a < altura; a++)

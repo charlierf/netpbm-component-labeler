@@ -1,552 +1,310 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "image_formats.h"
 #define FLOAT_TO_INT(x) ((x)>=0?(int)((x)+0.5):(int)((x)-0.5))
 
-typedef struct
+// PPM-specific implementation of initialization function
+imagemPPM* inicializaImagemPPM(imagemPPM *im, int altura, int largura)
 {
-    unsigned int red;
-    unsigned int green;
-    unsigned int blue;
-} pixel;
-
-typedef struct
-{
-    int altura;
-    int largura;
-    int gamma;
-    pixel * pixels;
-} imagem;
-
-imagem* inicializaImagem (imagem *im, int altura, int largura)
-{
-    im = malloc(sizeof(imagem));
+    im = malloc(sizeof(imagemPPM));
+    if (im == NULL) {
+        printf("Erro: Falha na alocação de memória para imagem PPM\n");
+        return NULL;
+    }
+    
     im->altura = altura;
     im->largura = largura;
-    im->gamma = 0;
-    im->pixels = malloc(altura*largura*sizeof(pixel));
-
+    im->gamma = 255; // Valor padrão
+    im->tipo = malloc(3 * sizeof(char));
+    im->head = malloc(40 * sizeof(char));
+    im->pixels = malloc(altura * largura * sizeof(pixel));
+    
+    if (im->tipo == NULL || im->head == NULL || im->pixels == NULL) {
+        printf("Erro: Falha na alocação de memória para componentes da imagem PPM\n");
+        free(im->tipo);
+        free(im->head);
+        free(im->pixels);
+        free(im);
+        return NULL;
+    }
+    
     return im;
 }
 
-imagem* getImage(FILE* file, char* tipo, char* head)
+imagemPPM* getImage(FILE* file, char* tipo, char* head)
 {
     char t = '\0';
-    char taux[10];
+    char taux[10] = {0};
     int n = 0;
     int c = 0;
     int l = 0;
-    imagem * p;
+    imagemPPM *p = NULL;
     pixel pix;
-
-    for (int i = 0; i < 10; i++)
-    {
-        taux[i] = '\0';
-    }
 
     if (file == NULL)
     {
         printf("ERRO! O arquivo nao foi aberto! Verifique o caminho e tente novamente.\n");
+        return NULL;
+    }
+
+    printf("O arquivo foi aberto com sucesso!\n");
+
+    // Ler o tipo de arquivo
+    n = 0;
+    while ((t = fgetc(file)) != '\n' && n < 3)
+    {
+        tipo[n++] = t;
+    }
+    tipo[n] = '\0';
+
+    // Verificar se é um arquivo P3
+    if (strcmp(tipo, "P3") == 0)
+    {
+        // Pular comentários
+        t = fgetc(file);
+        if (t == '#')
+        {
+            n = 0;
+            head[n++] = t;
+            while ((t = fgetc(file)) != '\n' && n < 40)
+            {
+                head[n++] = t;
+            }
+            head[n] = '\0';
+        }
+        else
+        {
+            ungetc(t, file);
+        }
+
+        // Ler dimensões
+        fscanf(file, "%d %d", &c, &l);
+        printf("A imagem possui %d x %d pixels", c, l);
+
+        // Inicializar imagem
+        p = inicializaImagemPPM(NULL, l, c);
+        if (p == NULL) {
+            return NULL;
+        }
+        
+        // Ler o valor máximo (gamma)
+        fscanf(file, "%d", &p->gamma);
+        printf(" e %d de valor max do pixel.\nCarregando...\n[", p->gamma);
+
+        // Ler pixels
+        for (int i = 0; i < l; i++)
+        {
+            for (int j = 0; j < c; j++)
+            {
+                fscanf(file, "%u", &pix.red);
+                fscanf(file, "%u", &pix.green);
+                fscanf(file, "%u", &pix.blue);
+                p->pixels[(i * c) + j] = pix;
+            }
+            if (i % 100 == 0)
+            {
+                printf(".");
+            }
+        }
+        printf("] Imagem carregada.\n\n");
     }
     else
     {
-        printf("O arquivo foi aberto com sucesso!\n");
-
-        while (t != '\n')
-        {
-            t = fgetc(file);
-            tipo[n] = t;
-            n++;
-        }
-        t = '\0';
-        n = 0;
-
-        if (tipo != NULL)
-        {
-            //Verificar se o formato � correto
-            if (strcmp(tipo, "P3\n") == 0)
-            {
-
-                t = getc(file);
-                if (t == '#')
-                {
-                    head[n] = t;
-                    n++;
-                    //Pegar cabe�alho at� posi��o 39 e pular o resto
-                    while (t != '\n')
-                    {
-                        if (n < 40)
-                        {
-                            t = fgetc(file);
-                            head[n] = t;
-                            n++;
-                        } else
-                        {
-                            t = fgetc(file);
-                            n++;
-                        }
-                    }
-                    n = 0;
-                    t = '\0';
-
-                    //Pegar colunas
-                    while (t != ' ')
-                    {
-                        t = fgetc(file);
-                        taux[n] = t;
-                        n++;
-                    }
-                    n = 0;
-                    c = atoi(taux);
-                    t = '\0';
-
-                } else
-                {
-                    taux[n] = t;
-                    n++;
-
-                    //Pegar colunas
-                    while (t != ' ')
-                    {
-                        t = fgetc(file);
-                        taux[n] = t;
-                        n++;
-                    }
-                    n = 0;
-                    c = atoi(taux);
-                    t = '\0';
-
-                }
-
-                //Pegar linhas
-                while (t != '\n')
-                {
-                    t = fgetc(file);
-                    taux[n] = t;
-                    n++;
-                }
-                n = 0;
-                l = atoi(taux);
-                t = '\0';
-                printf("A imagem possui %d x %d pixels", c, l);
-
-                //Criar imagem struct
-                p = inicializaImagem(p, l, c);
-
-                //Pegar tamanho do pixel
-                while (t != '\n')
-                {
-                    t = fgetc(file);
-                    taux[n] = t;
-                    n++;
-                }
-                p->gamma = atoi(taux);
-                n = 0;
-                t = '\0';
-                printf(" e %d de valor max do pixel.\nCarregando...\n[", p->gamma);
-
-                //Criando matriz da imagem
-                for(int i = 0; i < l; i++)
-                {
-                    for(int j = 0; j < c; j++)
-                    {
-                        //RED
-                        n = 0;
-                        while (t != '\n' && t != ' ' && t != EOF)
-                        {
-                            t = fgetc(file);
-                            taux[n] = t;
-                            if(t != '\n' || t != ' ' || t != EOF){ n++;}
-                        }
-                        pix.red = atoi(taux);
-                        t = '\0';
-
-                        //GREEN
-                        n = 0;
-                        while (t != '\n' && t != ' ' && t != EOF)
-                        {
-                            t = fgetc(file);
-                            taux[n] = t;
-                            if(t != '\n' || t != ' ' || t != EOF){ n++;}
-                        }
-                        pix.green = atoi(taux);
-                        t = '\0';
-
-                        //BLUE
-                        n = 0;
-                        while (t != '\n' && t != ' ' && t != EOF)
-                        {
-                            t = fgetc(file);
-                            taux[n] = t;
-                            if(t != '\n' || t != ' ' || t != EOF){ n++;}
-                        }
-                        pix.blue = atoi(taux);
-                        t = '\0';
-                        p->pixels[(i*c)+j] = pix;
-
-                    }
-                    if(i%100 == 0 ){printf(".");}
-                }
-                printf("] Imagem carregada.\n\n");
-            } else
-            {
-                printf("Tipo invalido %sCarregue um arquivo P3\n", tipo);
-            }
-        } else
-        {
-            printf("Arquivo invalido\n");
-        }
+        printf("Tipo invalido. Carregue um arquivo P3 (PPM).\n");
+        return NULL;
     }
-                return p;
+
+    return p;
 }
 
-void negativo(imagem* im)
+// PPM-specific version of negativo
+void negativoPPM(imagemPPM *im)
 {
     int l = im->altura;
     int c = im->largura;
-    printf("Gerando negativo...\n[");
-    for(int i = 0; i < l; i++)
-    {
-        for(int j = 0; j < c; j++)
-        {
-            im->pixels[(i*c)+j].red = im->gamma - im->pixels[(i*c)+j].red;
-            im->pixels[(i*c)+j].green = im->gamma - im->pixels[(i*c)+j].green;
-            im->pixels[(i*c)+j].blue = im->gamma - im->pixels[(i*c)+j].blue;
-        }
-        if(i%100 == 0 ){printf(".");}
-    }
-    printf("] 100%%\n\n");
-}
-
-
-void limiar(int limiarR, int limiarG, int limiarB, imagem* im)
-{
-    int l = im->altura;
-    int c = im->largura;
-    printf("Aplicando limiar R:%d, G:%d, B:%d ...\n[", limiarR, limiarG, limiarB);
-    for(int i = 0; i < l; i++)
-    {
-        for(int j = 0; j < c; j++)
-        {
-            //RED
-            if (im->pixels[(i*c)+j].red >= limiarR)
-            {
-                im->pixels[(i*c)+j].red = im->gamma;
-            } else {
-            im->pixels[(i*c)+j].red = 0;
-            }
-
-            //GREEN
-            if (im->pixels[(i*c)+j].green >= limiarG)
-            {
-                im->pixels[(i*c)+j].green = im->gamma;
-            } else {
-            im->pixels[(i*c)+j].green = 0;
-            }
-
-            //BLUE
-            if (im->pixels[(i*c)+j].blue >= limiarB)
-            {
-                im->pixels[(i*c)+j].blue = im->gamma;
-            } else {
-            im->pixels[(i*c)+j].blue = 0;
-            }
-        }
-        if(i%100 == 0 ){printf(".");}
-    }
-    printf("] 100%%\n\n");
-}
-
-void histograma (imagem* im, unsigned int histo[im->gamma + 1])
-{
-    int l = im->altura;
-    int c = im->largura;
-    int Lmax = im->gamma + 1;
-    printf("Calculando histograma simples...\n[");
-    for (int i = 0; i < Lmax; i++)
-    {
-        histo[i] = 0;
-    }
-
     for (int i = 0; i < l; i++)
     {
         for (int j = 0; j < c; j++)
         {
-            int aux = im->pixels[(i*c)+j].red;
-            histo[aux] = ++histo[aux];
-            aux = im->pixels[(i*c)+j].green;
-            histo[aux] = ++histo[aux];
-            aux = im->pixels[(i*c)+j].blue;
-            histo[aux] = ++histo[aux];
+            im->pixels[(i * c) + j].red = im->gamma - im->pixels[(i * c) + j].red;
+            im->pixels[(i * c) + j].green = im->gamma - im->pixels[(i * c) + j].green;
+            im->pixels[(i * c) + j].blue = im->gamma - im->pixels[(i * c) + j].blue;
         }
-        if(i%100 == 0 ){printf(".");}
     }
-    printf("] 100%%\n\n");
-    /*
-    for (int i = 0; i < Lmax; i++)
-    {
-        printf("h(%d): %d\n", i, histo[i]);
-    }
-    */
 }
 
-void histogramaRGB (imagem* im, unsigned int histoR[im->gamma + 1], unsigned int histoG[im->gamma + 1], unsigned int histoB[im->gamma + 1])
+void limiarPPM(int limiarR, int limiarG, int limiarB, imagemPPM* im)
 {
     int l = im->altura;
     int c = im->largura;
-    int Lmax = im->gamma + 1;
-    printf("Calculando histograma RGB...\n[");
-    for (int i = 0; i < Lmax; i++)
+    
+    for (int i = 0; i < l; i++)
+    {
+        for (int j = 0; j < c; j++)
+        {
+            // Apply thresholds - convert to unsigned for comparison
+            im->pixels[(i * c) + j].red = (im->pixels[(i * c) + j].red >= (unsigned int)limiarR) ? 
+                                           im->gamma : 0;
+            im->pixels[(i * c) + j].green = (im->pixels[(i * c) + j].green >= (unsigned int)limiarG) ? 
+                                              im->gamma : 0;
+            im->pixels[(i * c) + j].blue = (im->pixels[(i * c) + j].blue >= (unsigned int)limiarB) ? 
+                                             im->gamma : 0;
+        }
+    }
+}
+
+void histogramaPPM(imagemPPM* im, unsigned int histo[])
+{
+    int l = im->altura;
+    int c = im->largura;
+    
+    // Initialize histogram
+    for (int i = 0; i <= im->gamma; i++)
+    {
+        histo[i] = 0;
+    }
+    
+    // Count average pixel values
+    for (int i = 0; i < l; i++)
+    {
+        for (int j = 0; j < c; j++)
+        {
+            unsigned int avg = (im->pixels[(i * c) + j].red + 
+                               im->pixels[(i * c) + j].green + 
+                               im->pixels[(i * c) + j].blue) / 3;
+            histo[avg]++;
+        }
+    }
+}
+
+void histogramaRGB(imagemPPM* im, unsigned int histoR[], unsigned int histoG[], unsigned int histoB[])
+{
+    int l = im->altura;
+    int c = im->largura;
+    
+    // Initialize histograms
+    for (int i = 0; i <= im->gamma; i++)
     {
         histoR[i] = 0;
         histoG[i] = 0;
         histoB[i] = 0;
     }
-
+    
+    // Count pixel values
     for (int i = 0; i < l; i++)
     {
         for (int j = 0; j < c; j++)
         {
-            int aux = im->pixels[(i*c)+j].red;
-            histoR[aux] = ++histoR[aux];
-
-            aux = im->pixels[(i*c)+j].green;
-            histoG[aux] = ++histoG[aux];
-
-            aux = im->pixels[(i*c)+j].blue;
-            histoB[aux] = ++histoB[aux];
+            histoR[im->pixels[(i * c) + j].red]++;
+            histoG[im->pixels[(i * c) + j].green]++;
+            histoB[im->pixels[(i * c) + j].blue]++;
         }
-        if(i%100 == 0 ){printf(".");}
     }
-    printf("] 100%%\n\n");
-    /*
-    for (int i = 0; i < Lmax; i++)
-    {
-        printf("h(%d): %d\n", i, histo[i]);
-    }
-    */
 }
 
-void equalizar (imagem* im, unsigned int histo[im->gamma + 1])
+void equalizarPPM(imagemPPM* im, unsigned int histo[])
 {
     int l = im->altura;
     int c = im->largura;
-    int Lmax = im->gamma + 1;
-    float probabilidade[Lmax], pA[Lmax];
-    int g[Lmax];
-    printf("Equalizando imagem...\n[");
-
-
-    for (int i = 0; i < Lmax; i++)
+    int pixelCount = l * c;
+    float cdf[256] = {0};
+    int newValues[256] = {0};
+    
+    // Calculate CDF
+    float sum = 0.0f;
+    for (int i = 0; i <= im->gamma; i++)
     {
-        probabilidade[i] = (float)histo[i]/(float)(3*l*c);
-        //printf("P(%d) = %d/%d: %f ", i, histo[i], c*l, probabilidade[i]);
-        if(i%100 == 0 ){printf(".");}
+        sum += (float)histo[i] / pixelCount;
+        cdf[i] = sum;
+        newValues[i] = (int)(cdf[i] * im->gamma + 0.5f);
     }
-
-    for (int i = 0; i < Lmax; i++)
-    {
-        if (i == 0) {pA[i] = probabilidade[i];}
-        else {pA[i] = probabilidade[i] + pA[i-1];}
-        //printf("pA(%d): %f ", i, pA[i]);
-        if(i%100 == 0 ){printf(".");}
-    }
-
-    for (int i = 0; i < Lmax; i++)
-    {
-        g[i] = FLOAT_TO_INT(pA[i] * (float)(Lmax-1));
-        //printf("g(%d): %d ", i, g[i]);
-        if(i%100 == 0 ){printf(".");}
-    }
-
+    
+    // Apply equalization
     for (int i = 0; i < l; i++)
     {
         for (int j = 0; j < c; j++)
         {
-            int aux = im->pixels[(i*c)+j].red;
-            im->pixels[(i*c)+j].red = g[aux];
-
-            aux = im->pixels[(i*c)+j].green;
-            im->pixels[(i*c)+j].green = g[aux];
-
-            aux = im->pixels[(i*c)+j].blue;
-            im->pixels[(i*c)+j].blue = g[aux];
+            unsigned int avg = (im->pixels[(i * c) + j].red + 
+                               im->pixels[(i * c) + j].green + 
+                               im->pixels[(i * c) + j].blue) / 3;
+            float factor = avg > 0 ? (float)newValues[avg] / avg : 1.0f;
+            
+            unsigned int newRed = (unsigned int)(im->pixels[(i * c) + j].red * factor);
+            unsigned int newGreen = (unsigned int)(im->pixels[(i * c) + j].green * factor);
+            unsigned int newBlue = (unsigned int)(im->pixels[(i * c) + j].blue * factor);
+            
+            im->pixels[(i * c) + j].red = newRed <= im->gamma ? newRed : im->gamma;
+            im->pixels[(i * c) + j].green = newGreen <= im->gamma ? newGreen : im->gamma;
+            im->pixels[(i * c) + j].blue = newBlue <= im->gamma ? newBlue : im->gamma;
         }
-        if(i%100 == 0 ){printf(".");}
     }
-    printf("] 100%%\n\n");
-
 }
 
-void equalizarRGB (imagem* im, unsigned int histoR[im->gamma + 1], unsigned int histoG[im->gamma + 1], unsigned int histoB[im->gamma + 1])
+void equalizarRGB(imagemPPM* im, unsigned int histoR[], unsigned int histoG[], unsigned int histoB[])
 {
     int l = im->altura;
     int c = im->largura;
-    int Lmax = im->gamma + 1;
-    float prR[Lmax], prG[Lmax], prB[Lmax], pAR[Lmax], pAG[Lmax], pAB[Lmax], aux;
-    int gR[Lmax], gG[Lmax], gB[Lmax];
-    aux = 0;
-    printf("Equalizando canais da imagem...\n[");
-
-    for (int i = 0; i < Lmax; i++)
+    int pixelCount = l * c;
+    float cdfR[256] = {0}, cdfG[256] = {0}, cdfB[256] = {0};
+    int newR[256] = {0}, newG[256] = {0}, newB[256] = {0};
+    
+    // Calculate CDFs
+    float sumR = 0.0f, sumG = 0.0f, sumB = 0.0f;
+    for (int i = 0; i <= im->gamma; i++)
     {
-        prR[i] = (float)histoR[i]/(float)(l*c);
-        prG[i] = (float)histoG[i]/(float)(l*c);
-        prB[i] = (float)histoB[i]/(float)(l*c);
-        //printf("P(%d) = %d/%d: %f ", i, histo[i], c*l, probabilidade[i]);
-        if(i%100 == 0 ){printf(".");}
+        sumR += (float)histoR[i] / pixelCount;
+        sumG += (float)histoG[i] / pixelCount;
+        sumB += (float)histoB[i] / pixelCount;
+        
+        cdfR[i] = sumR;
+        cdfG[i] = sumG;
+        cdfB[i] = sumB;
+        
+        newR[i] = (int)(cdfR[i] * im->gamma + 0.5f);
+        newG[i] = (int)(cdfG[i] * im->gamma + 0.5f);
+        newB[i] = (int)(cdfB[i] * im->gamma + 0.5f);
     }
-
-    for (int i = 0; i < Lmax; i++)
-    {
-        pAR[i] = prR[i] + aux;
-        aux = pAR[i];
-
-        pAG[i] = prG[i] + aux;
-        aux = pAG[i];
-
-        pAB[i] = prB[i] + aux;
-        aux = pAB[i];
-        //printf("pA(%d): %f ", i, pA[i]);
-        if(i%100 == 0 ){printf(".");}
-    }
-
-    for (int i = 0; i < Lmax; i++)
-    {
-        gR[i] = FLOAT_TO_INT(pAR[i] * (float)(Lmax-1));
-        gG[i] = FLOAT_TO_INT(pAG[i] * (float)(Lmax-1));
-        gB[i] = FLOAT_TO_INT(pAB[i] * (float)(Lmax-1));
-        //printf("g(%d): %d ", i, g[i]);
-        if(i%100 == 0 ){printf(".");}
-    }
-
+    
+    // Apply equalization
     for (int i = 0; i < l; i++)
     {
         for (int j = 0; j < c; j++)
         {
-            int aux = im->pixels[(i*c)+j].red;
-            im->pixels[(i*c)+j].red = gR[aux];
-
-            aux = im->pixels[(i*c)+j].green;
-            im->pixels[(i*c)+j].green = gG[aux];
-
-            aux = im->pixels[(i*c)+j].blue;
-            im->pixels[(i*c)+j].blue = gB[aux];
+            im->pixels[(i * c) + j].red = newR[im->pixels[(i * c) + j].red];
+            im->pixels[(i * c) + j].green = newG[im->pixels[(i * c) + j].green];
+            im->pixels[(i * c) + j].blue = newB[im->pixels[(i * c) + j].blue];
         }
-        if(i%100 == 0 ){printf(".");}
     }
-    printf("] 100%%\n\n");
-
 }
 
-void brilho (imagem* im, int valor)
+void brilho(imagemPPM* im, int valor)
 {
     int l = im->altura;
     int c = im->largura;
-    printf("Aumentando o brilho em $d ... [", valor);
+    
+    printf("Ajustando brilho em %d...\n", valor);
+    
     for (int i = 0; i < l; i++)
     {
         for (int j = 0; j < c; j++)
         {
-            if ((im->pixels[(i*c)+j].red + valor) > im->gamma)
-            {
-                im->pixels[(i*c)+j].red = 255;
-            } else { im->pixels[(i*c)+j].red = im->pixels[(i*c)+j].red + valor;}
-
-            if ((im->pixels[(i*c)+j].green + valor) > im->gamma)
-            {
-                im->pixels[(i*c)+j].green = 255;
-            } else { im->pixels[(i*c)+j].green = im->pixels[(i*c)+j].green + valor;}
-
-            if ((im->pixels[(i*c)+j].blue + valor) > im->gamma)
-            {
-                im->pixels[(i*c)+j].blue = 255;
-            } else { im->pixels[(i*c)+j].blue = im->pixels[(i*c)+j].blue + valor;}
+            // Apply brightness with bounds checking using proper type comparison
+            int newRed = (int)im->pixels[(i * c) + j].red + valor;
+            int newGreen = (int)im->pixels[(i * c) + j].green + valor;
+            int newBlue = (int)im->pixels[(i * c) + j].blue + valor;
+            
+            // Clamp values
+            im->pixels[(i * c) + j].red = (newRed < 0) ? 0 : 
+                                          (newRed > (int)im->gamma) ? im->gamma : (unsigned int)newRed;
+            
+            im->pixels[(i * c) + j].green = (newGreen < 0) ? 0 : 
+                                            (newGreen > (int)im->gamma) ? im->gamma : (unsigned int)newGreen;
+            
+            im->pixels[(i * c) + j].blue = (newBlue < 0) ? 0 : 
+                                          (newBlue > (int)im->gamma) ? im->gamma : (unsigned int)newBlue;
         }
-        if(i%100 == 0 ){printf(".");}
     }
-    printf("] 100%%\n\n");
-}
-
-int main ()
-{
-    FILE *entrada, *saida;
-    char *tipo;
-    char *head;
-    imagem *p;
-
-    char t = '\0';
-    char taux[10];
-    pixel pix;
-    int c, l;
-    int n = 0;
-
-    tipo = malloc(3*sizeof(char));
-    head = malloc(40*sizeof(char));
-    pix.red = 0; pix.green = 0; pix.blue = 0;
-
-    entrada = fopen("Figuras/Lana Conquista.ppm", "r");
-
-    p = getImage(entrada, tipo, head);
-
-    c = p->largura;
-    l = p->altura;
-
-    //negativo(p);
-    //limiar(127, 127, 127, p);
-    //brilho(p, 100);
-
-    unsigned int hi[p->gamma+1], hiR[p->gamma+1], hiG[p->gamma+1], hiB[p->gamma+1];
-
-    histograma(p, hi);
-    equalizar(p, hi);
-
-    //histogramaRGB(p, hiR, hiG, hiB);
-    //equalizarRGB(p, hiR, hiG, hiB);
-
-    /*
-    for (int i = 0; i < gamma+1; i++)
-    {
-        printf("h(%d): %d\n", i, histo[i]);
-    }
-    */
-
-    //Imprimindo matriz da imagem
-    saida = fopen("Figuras/teste.ppm", "w");
-    fclose(saida);
-    saida = fopen("Figuras/teste.ppm", "a");
-    printf("Salvando imagem Tipo:%c%c com %dx%d pixels e %d tons...\n[", tipo[0], tipo[1], p->largura, p->altura, p->gamma);
-    fprintf(saida, "%s#Criado por CharlieRF\n%d %d\n%d\n", tipo, p->largura, p->altura, p->gamma);
-
-    for(int a = 0; a < l; a++)
-    {
-        for(int b = 0; b < c; b++)
-        {
-            fprintf(saida, "%d\n", p->pixels[(a*c)+b].red);
-            fprintf(saida, "%d\n", p->pixels[(a*c)+b].green);
-            fprintf(saida, "%d\n", p->pixels[(a*c)+b].blue);
-        }
-        if(a%100 == 0 ){printf(".");}
-    }
-    printf("] 100%%\n");
-
-    if (saida != NULL)
-    {
-        printf("Arquivo 'teste.ppm' criado com sucesso.\n");
-    }
-    else{
-        printf("Falha na operacao.");
-    }
-
-
-    fclose(entrada);
-    fclose(saida);
-    free(tipo);
-    free(head);
-    free(p);
-
-    system("pause");
-
-    return 0;
-
+    
+    printf("Brilho ajustado com sucesso.\n");
 }

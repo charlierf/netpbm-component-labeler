@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../include/algorithms.h"
-#include "../../include/image_formats.h"
+#include "algorithms.h"
+#include "image_formats.h"
 
 // Estrutura da pilha para processamento não recursivo
 typedef struct reg
@@ -10,12 +10,12 @@ typedef struct reg
     int x;
     int y;
     struct reg *prox;
-} celula;
+} celula_algoritmo;
 
-void push(int x, int y, celula *p)
+void push_algoritmo(int x, int y, celula_algoritmo *p)
 {
-    celula *nova;
-    nova = malloc(sizeof(celula));
+    celula_algoritmo *nova;
+    nova = malloc(sizeof(celula_algoritmo));
     if (nova == NULL)
     {
         printf("Erro de alocação de memória\n");
@@ -27,16 +27,16 @@ void push(int x, int y, celula *p)
     p->prox = nova;
 }
 
-celula* pop(celula *p)
+celula_algoritmo* pop_algoritmo(celula_algoritmo *p)
 {
-    celula* pop = p->prox;
+    celula_algoritmo* pop = p->prox;
     p->prox = pop->prox;
     return pop;
 }
 
-celula* criaPilha()
+celula_algoritmo* criaPilha()
 {
-    celula *pi = malloc(sizeof(celula));
+    celula_algoritmo *pi = malloc(sizeof(celula_algoritmo));
     if (pi == NULL)
     {
         printf("Erro de alocação de memória\n");
@@ -114,12 +114,12 @@ int PreencheFundo(int largura, int altura, int* saida, int x, int y)
 {
     int index = x + largura*y;
     if (saida[index] != 0) return 0; // Este pixel não faz parte do fundo
-    celula *pilha = criaPilha(); // Cria uma pilha vazia
-    push(x, y, pilha); // Insere as coordenadas iniciais na pilha
+    celula_algoritmo *pilha = criaPilha(); // Cria uma pilha vazia
+    push_algoritmo(x, y, pilha); // Insere as coordenadas iniciais na pilha
 
     while (pilha->prox != NULL)   // Enquanto a pilha não estiver vazia
     {
-        celula *aux = pop(pilha); // Remove o elemento do topo da pilha
+        celula_algoritmo *aux = pop_algoritmo(pilha); // Remove o elemento do topo da pilha
         x = aux->x; // Atualiza as coordenadas
         y = aux->y;
         free(aux);
@@ -129,10 +129,10 @@ int PreencheFundo(int largura, int altura, int* saida, int x, int y)
         {
             saida[index] = -1; // Marca com um valor negativo
             // Agora verifica os 4 vizinhos e insere na pilha se forem válidos:
-            if (x > 0 && saida[index-1] == 0) push(x-1, y, pilha); // pixel esquerdo
-            if (y > 0 && saida[index-largura] == 0) push(x, y-1, pilha); // pixel superior
-            if (x < largura-1 && saida[index+1] == 0) push(x+1, y, pilha); // pixel direito
-            if (y < altura-1 && saida[index+largura] == 0) push(x, y+1, pilha); // pixel inferior
+            if (x > 0 && saida[index-1] == 0) push_algoritmo(x-1, y, pilha); // pixel esquerdo
+            if (y > 0 && saida[index-largura] == 0) push_algoritmo(x, y-1, pilha); // pixel superior
+            if (x < largura-1 && saida[index+1] == 0) push_algoritmo(x+1, y, pilha); // pixel direito
+            if (y < altura-1 && saida[index+largura] == 0) push_algoritmo(x, y+1, pilha); // pixel inferior
         }
     }
 
