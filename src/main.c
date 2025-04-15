@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     entrada = fopen(argv[1], "r"); // Abrir a imagem com o nome passado como argumento
 
     // Criar o arquivo de saída com o nome "saida.ppm"
-    saida = fopen("saida.ppm", "w");
+    saida = fopen("./examples/output/saida.ppm", "w");
 
     // Carregar imagem de entrada no ponteiro para struct imagem, p
     p = carregaImagem(entrada, tipo, head);
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
     }
     if (saida != NULL)
     {
-        printf("O arquivo 'saida.ppm' foi criado com sucesso e vai ser aberto em seguida...\n");
+        printf("O arquivo 'saida.ppm' foi criado com sucesso em './examples/output' e vai ser aberto em seguida...\n");
     }
     else
     {
