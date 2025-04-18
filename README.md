@@ -1,4 +1,4 @@
-Leia em [Português](README.pt-br.md)
+Leia em [Português](README.pt-BR.md)
 # NetPBM Component Labeler
 
 A tool for labeling and analyzing connected components in NetPBM images (PBM, PGM, PPM).
